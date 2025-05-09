@@ -32,10 +32,10 @@ async def shutdown(ctx):
 
 
 status_options = {
-    "working": "🟢｜WORKING",
-    "update": "🟡｜UPDATE",
-    "down": "🔴｜DOWN",
-    "coming_soon": "🔵｜COMING SOON"
+    "working": "｛🟢｝WORKING",
+    "update": "｛🟡｝UPDATE",
+    "down": "｛🔴｝DOWN",
+    "coming_soon": "｛🔵｝COMING SOON"
 }
 
 class StatusButtonView(ui.View):
@@ -102,15 +102,25 @@ async def on_message_delete(message):
         await send_button_message()
 
 
-# Function to send the button message (including resend logic)
 async def send_button_message():
     channel = bot.get_channel(BUTTON_CHANNEL_ID)
+
+    # チャンネル内のメッセージを全削除（自身のメッセージも含む）
+    def is_deletable(message):
+        return True  # 全メッセージ対象にする
+
+    deleted = await channel.purge(limit=None, check=is_deletable)
+    print(f"🗑️ {len(deleted)} 件のメッセージを削除しました。")
+
+    # 新しい埋め込みとボタンを送信
     embed = discord.Embed(
         title="🔧 Script Status Change",
         description="Click the buttons below to change the script status.",
         color=0x00ffcc
     )
     await channel.send(embed=embed, view=StatusButtonView())
+
+
 
 
 # Send button message if it's missing
