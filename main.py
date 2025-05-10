@@ -13,11 +13,19 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 STATUS_CHANNEL_ID = int(os.getenv("STATUS_CHANNEL_ID"))
 BUTTON_CHANNEL_ID = int(os.getenv("BUTTON_CHANNEL_ID"))
+WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID"))
+BUTTON_CHANNEL_ID = int(os.getenv("VERIFY_CHANNEL_ID")) 
+GUILD_ID = int(os.getenv("GUILD_ID"))  # サーバーID
+ROLE_ID = int(os.getenv("ROLE_ID"))
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.messages = True  # For message delete event
-bot = commands.Bot(command_prefix="!", intents=intents)
+intents.messages = True
+intents = discord.Intents.default()
+intents.members = True
+
+bot = commands.Bot(command_prefix='!', help_command=None, intents=intents)
+
 
 @bot.command()
 async def shutdown(ctx):
@@ -130,6 +138,71 @@ async def send_button_message_if_missing():
         if message.author == bot.user and message.components:
             return
     await send_button_message()
+
+@bot.command(name='loadstring')
+async def loadstring_command(ctx, url: str = None):
+    if not url:
+        await ctx.send("❌ Usage: `!loadstring <URL>` – Please provide a valid URL.")
+        return
+
+    if not url.startswith("http"):
+        await ctx.send("❌ Invalid URL. Make sure it starts with 'http'.")
+        return
+
+    lua_code = f'```lua\nloadstring(game:HttpGet("{url}"))()\n```'
+    await ctx.send(lua_code)
+
+@bot.command(name="info")
+async def info_command(ctx):
+    embed = discord.Embed(title="📜 Command List", color=discord.Color.green())
+    embed.add_field(name="!loadstring <url>", value="Converts a URL into a Roblox loadstring.", inline=False)
+    embed.add_field(name="!shutdown", value="Shuts down the bot (owner only).", inline=False)
+    embed.add_field(name="!info", value="Shows this help message.", inline=False)
+    await ctx.send(embed=embed)
+
+@bot.command(name="help")  # ❌ これを削除または無効化
+async def help_command(ctx):
+    ...
+@bot.event
+async def on_member_join(member):
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    if channel:
+        await channel.send(f"Welcome to the server, {member.mention}!")
+
+# 認証ボタンのUIクラス
+class AuthButtonView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)  # ボタンが永遠に表示されるように
+        self.bot = bot
+
+    @ui.button(label="Click to Verify", style=discord.ButtonStyle.green, custom_id="verify_button")
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # ボタンを押したユーザー
+        member = interaction.user
+        
+        # サーバーとロールを取得
+        guild = bot.get_guild(GUILD_ID)
+        role = guild.get_role(ROLE_ID)
+        
+        if guild and role:
+            # ユーザーにロールを付与
+            await member.add_roles(role)
+            await interaction.response.send_message(f"✅ {member.mention} has been verified and the role has been assigned!", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Unable to assign the role. Please check the server and role configuration.", ephemeral=True)
+
+# Botイベント: ボットがオンラインになったとき
+@bot.event
+async def on_ready():
+    print(f"{bot.user} has logged in.")
+    channel = bot.get_channel(BUTTON_CHANNEL_ID)
+    
+    if channel:
+        # 認証ボタンを送信
+        embed = discord.Embed(title="Please click the button below to verify yourself.", color=0x00ff00)
+        await channel.send(embed=embed, view=AuthButtonView())
+    else:
+        print("Channel not found.")
 
 
 # Run the bot
